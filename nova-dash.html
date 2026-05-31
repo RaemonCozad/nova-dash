@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>NOVA DASH</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --accent: #00f5ff;
+    --accent2: #ff3cac;
+    --gold: #ffd700;
+    --green: #39ff14;
+    --text: #e8e8f0;
+    --dim: #555570;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #wrapper {
+    position: relative;
+    width: 800px;
+    max-width: 100vw;
+  }
+
+  /* ── HUD ── */
+  #hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-bottom: none;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .hud-block { display: flex; flex-direction: column; gap: 4px; }
+  .hud-label { color: var(--dim); font-size: 7px; }
+  .hud-val   { color: var(--accent); }
+  .hud-val.gold  { color: var(--gold); }
+  .hud-val.green { color: var(--green); }
+
+  /* health bar */
+  #health-bar-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+  }
+  #health-bar {
+    width: 120px; height: 10px;
+    background: #1a1a2e;
+    border: 1px solid var(--dim);
+    position: relative;
+    overflow: hidden;
+  }
+  #health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff3cac, #ff6b6b);
+    transition: width 0.2s;
+  }
+
+  /* ── CANVAS ── */
+  #canvas {
+    display: block;
+    border: 2px solid var(--accent);
+    cursor: none;
+    image-rendering: pixelated;
+  }
+
+  /* ── OVERLAY SCREENS ── */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(10,10,15,0.92);
+    gap: 20px;
+    z-index: 10;
+  }
+  .screen.hidden { display: none; }
+
+  .screen h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 32px;
+    color: var(--accent);
+    text-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent);
+    letter-spacing: 0.1em;
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  .screen h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 18px;
+    color: var(--accent2);
+    text-shadow: 0 0 12px var(--accent2);
+  }
+  @keyframes glow {
+    from { text-shadow: 0 0 10px var(--accent), 0 0 20px var(--accent); }
+    to   { text-shadow: 0 0 20px var(--accent), 0 0 60px var(--accent), 0 0 80px #0cf; }
+  }
+
+  .screen p {
+    font-size: 15px; color: var(--dim);
+    text-align: center; line-height: 1.8;
+    max-width: 420px;
+  }
+  .screen p span { color: var(--accent); font-weight: 700; }
+
+  .btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 12px;
+    padding: 14px 32px;
+    background: transparent;
+    color: var(--accent);
+    border: 2px solid var(--accent);
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--accent);
+    transform: translateX(-100%);
+    transition: transform 0.15s;
+    z-index: -1;
+  }
+  .btn:hover { color: var(--bg); }
+  .btn:hover::before { transform: translateX(0); }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+    font-size: 13px;
+  }
+  .stat-grid .lbl { color: var(--dim); }
+  .stat-grid .val { color: var(--accent); font-weight: 700; text-align: right; }
+
+  /* ── MOBILE CONTROLS ── */
+  #mobile-controls {
+    display: none;
+    justify-content: space-between;
+    padding: 10px 8px 4px;
+    background: var(--panel);
+    border: 2px solid var(--accent);
+    border-top: none;
+  }
+  @media (max-width: 600px) { #mobile-controls { display: flex; } }
+  .mob-btn {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 14px;
+    width: 60px; height: 50px;
+    background: rgba(0,245,255,0.1);
+    border: 2px solid var(--accent);
+    color: var(--accent);
+    cursor: pointer;
+    border-radius: 4px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .mob-btn:active { background: rgba(0,245,255,0.3); }
+</style>
+</head>
+<body>
+<div id="wrapper">
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="hud-block">
+      <div class="hud-label">SCORE</div>
+      <div class="hud-val" id="h-score">0</div>
+    </div>
+    <div class="hud-block">
+      <div class="hud-label">COINS</div>
+      <div class="hud-val gold" id="h-coins">0</div>
+    </div>
+    <div id="health-bar-wrap">
+      <div class="hud-label">HEALTH</div>
+      <div id="health-bar"><div id="health-fill" style="width:100%"></div></div>
+    </div>
+    <div class="hud-block" style="text-align:right">
+      <div class="hud-label">LEVEL</div>
+      <div class="hud-val green" id="h-level">1</div>
+    </div>
+    <div class="hud-block" style="text-align:right">
+      <div class="hud-label">HI-SCORE</div>
+      <div class="hud-val" id="h-hi">0</div>
+    </div>
+  </div>
+
+  <!-- CANVAS -->
+  <canvas id="canvas" width="800" height="450"></canvas>
+
+  <!-- MOBILE CONTROLS -->
+  <div id="mobile-controls">
+    <div style="display:flex;gap:6px">
+      <button class="mob-btn" id="mb-left">◀</button>
+      <button class="mob-btn" id="mb-right">▶</button>
+    </div>
+    <button class="mob-btn" id="mb-jump" style="font-size:20px">↑</button>
+  </div>
+
+  <!-- TITLE SCREEN -->
+  <div class="screen" id="screen-title">
+    <h1>NOVA DASH</h1>
+    <p>
+      <span>Arrow Keys / WASD</span> to move &amp; jump<br>
+      Collect <span>coins</span>, crush <span>enemies</span>, reach the <span>portal</span><br>
+      Double-jump mid-air · Wall-jump off surfaces
+    </p>
+    <button class="btn" onclick="startGame()">START GAME</button>
+  </div>
+
+  <!-- LEVEL COMPLETE SCREEN -->
+  <div class="screen hidden" id="screen-win">
+    <h2>LEVEL CLEAR!</h2>
+    <div class="stat-grid" id="win-stats"></div>
+    <button class="btn" onclick="nextLevel()">NEXT LEVEL</button>
+  </div>
+
+  <!-- GAME OVER SCREEN -->
+  <div class="screen hidden" id="screen-over">
+    <h1 style="color:var(--accent2);text-shadow:0 0 20px var(--accent2)">GAME OVER</h1>
+    <div class="stat-grid" id="over-stats"></div>
+    <button class="btn" onclick="startGame()">TRY AGAIN</button>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// NOVA DASH — Complete 2D Platformer
+// ═══════════════════════════════════════════════════════════════
+
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ── CONSTANTS ──────────────────────────────────────────────────
+const GRAVITY   = 0.55;
+const MAX_FALL  = 14;
+const TILE      = 32;
+const COLORS = {
+  sky1: '#0a0a1a', sky2: '#0d1535',
+  ground: '#1a3a5c', groundTop: '#00f5ff',
+  platform: '#1e2a4a', platformTop: '#ff3cac',
+  spike: '#ff3030',
+  coin: '#ffd700',
+  portal: '#39ff14',
+  enemy1: '#ff3cac',
+  enemy2: '#ff8c00',
+  player: '#00f5ff',
+  particle: ['#00f5ff','#ff3cac','#ffd700','#39ff14'],
+};
+
+// ── STATE ──────────────────────────────────────────────────────
+let G = {}; // all mutable game state
+let hiScore = +localStorage.getItem('novaDashHi') || 0;
+let currentLevel = 0;
+let running = false;
+let rafId   = null;
+
+// ── INPUT ──────────────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+});
+document.addEventListener('keyup',  e => { keys[e.code] = false; });
+
+// Mobile buttons
+const mb = {left:false, right:false, jump:false};
+function mbDown(k){ mb[k]=true; }
+function mbUp(k)  { mb[k]=false; }
+document.getElementById('mb-left').addEventListener('touchstart',  e=>{e.preventDefault();mbDown('left');});
+document.getElementById('mb-left').addEventListener('touchend',    e=>{e.preventDefault();mbUp('left');});
+document.getElementById('mb-right').addEventListener('touchstart', e=>{e.preventDefault();mbDown('right');});
+document.getElementById('mb-right').addEventListener('touchend',   e=>{e.preventDefault();mbUp('right');});
+document.getElementById('mb-jump').addEventListener('touchstart',  e=>{e.preventDefault();mbDown('jump');});
+document.getElementById('mb-jump').addEventListener('touchend',    e=>{e.preventDefault();mbUp('jump');});
+
+function pressing(action) {
+  if (action === 'left')  return keys['ArrowLeft']  || keys['KeyA'] || mb.left;
+  if (action === 'right') return keys['ArrowRight'] || keys['KeyD'] || mb.right;
+  if (action === 'jump')  return keys['ArrowUp'] || keys['KeyW'] || keys['Space'] || mb.jump;
+}
+
+// ── AUDIO (Web Audio API — no files needed) ─────────────────────
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playTone(freq, type, duration, vol=0.15, decay=true) {
+  try {
+    const ac  = getAudio();
+    const osc = ac.createOscillator();
+    const gain= ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = type; osc.frequency.setValueAtTime(freq, ac.currentTime);
+    gain.gain.setValueAtTime(vol, ac.currentTime);
+    if (decay) gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + duration);
+    osc.start(); osc.stop(ac.currentTime + duration);
+  } catch(e){}
+}
+function sfxJump()   { playTone(420,'sine',0.18); }
+function sfxCoin()   { playTone(880,'sine',0.12); playTone(1100,'sine',0.1); }
+function sfxHurt()   { playTone(120,'sawtooth',0.25,0.2); }
+function sfxKill()   { playTone(200,'square',0.1); playTone(400,'square',0.12); }
+function sfxWin()    { [523,659,784,1047].forEach((f,i)=>setTimeout(()=>playTone(f,'sine',0.3,0.2),i*120)); }
+function sfxPortal() { [300,600,900,1200].forEach((f,i)=>setTimeout(()=>playTone(f,'sine',0.2),i*80)); }
+
+// ── LEVEL DEFINITIONS ──────────────────────────────────────────
+// Tiles: '#'=ground, '.'=air, 'P'=player start, '$'=coin,
+//        'E'=enemy, 'S'=spike, 'G'=portal, 'F'=floating platform
+// Each level is 25 cols × 14 rows of 32px tiles = 800×448
+
+const LEVELS = [
+// ── LEVEL 1 ─────────────────────────────────────────────────
+`
+.........................
+.....$.......$.....G....
+.....###.....###...###..
+.........................
+....$.....$..............
+..###....###.............
+.........................
+P.......E.......E.......
+#########################
+#########################
+`,
+
+// ── LEVEL 2 ─────────────────────────────────────────────────
+`
+.......................G.
+.....$..............$..#
+.....##...####.....####.
+.........................
+..$...........$..$.......
+.###..........###.###....
+.................$.......
+P..E..........E.........
+#########################
+#########################
+`,
+
+// ── LEVEL 3 ─────────────────────────────────────────────────
+`
+G........................
+#.....$...........$......
+#....###.........###.....
+#........................
+#.$......$...$...........
+####....###..###.........
+#...........$..E...E.....
+P.E...................E..
+#########################
+#########################
+`,
+
+// ── LEVEL 4 ─────────────────────────────────────────────────
+`
+.........................
+..G.$.$.$.$.$.$.$.$..$...
+..######################.
+.........................
+..$.......$.......$......
+..##.......##.......##...
+.........................
+P.....E.....E.....E.....E
+#########################
+#########################
+`,
+
+// ── LEVEL 5 ─────────────────────────────────────────────────
+`
+.......................G.
+....................$..##
+.....$.....$.......####.
+.....##....##...........
+..$...........$..$.......
+.###..........##..###....
+.........................
+P...E.....E.......E....E.
+#########################
+#########################
+`,
+];
+
+// ── PARSE LEVEL ────────────────────────────────────────────────
+function parseLevel(idx) {
+  const raw   = LEVELS[idx % LEVELS.length].trim().split('\n');
+  const tiles = [];
+  const coins = [], enemies = [], spikes = [];
+  let playerStart = {x:64, y:300};
+  let portal = null;
+
+  for (let r = 0; r < raw.length; r++) {
+    tiles[r] = [];
+    for (let c = 0; c < raw[r].length; c++) {
+      const ch = raw[r][c] || '.';
+      const px = c * TILE, py = r * TILE;
+      if (ch === '#') { tiles[r][c] = 'ground'; }
+      else if (ch === 'P') { playerStart = {x:px+4, y:py}; tiles[r][c] = '.'; }
+      else if (ch === '$') { coins.push({x:px+8, y:py+8, w:16, h:16, alive:true}); tiles[r][c] = '.'; }
+      else if (ch === 'E') { enemies.push(makeEnemy(px, py)); tiles[r][c] = '.'; }
+      else if (ch === 'S') { spikes.push({x:px, y:py+16, w:32, h:16}); tiles[r][c] = '.'; }
+      else if (ch === 'G') { portal = {x:px+4, y:py, w:24, h:32}; tiles[r][c] = '.'; }
+      else { tiles[r][c] = '.'; }
+    }
+  }
+  return { tiles, coins, enemies, spikes, portal, playerStart };
+}
+
+function makeEnemy(x, y) {
+  return {
+    x, y, w:24, h:24,
+    vx: (Math.random() < 0.5 ? 1 : -1) * (1.2 + Math.random()),
+    vy: 0,
+    onGround: false,
+    alive: true,
+    frame: 0,
+    frameTimer: 0,
+  };
+}
+
+// ── MAKE PLAYER ────────────────────────────────────────────────
+function makePlayer(x, y) {
+  return {
+    x, y, w: 24, h: 28,
+    vx: 0, vy: 0,
+    onGround: false,
+    onWall: 0,       // -1 left wall, +1 right wall, 0 none
+    jumpsLeft: 2,    // double jump
+    jumpHeld: false,
+    invincible: 0,   // frames of invincibility after hit
+    health: 5,
+    frame: 0,
+    frameTimer: 0,
+    facing: 1,
+    trail: [],
+  };
+}
+
+// ── TILE COLLISION ─────────────────────────────────────────────
+function isSolid(tiles, col, row) {
+  if (row < 0 || row >= tiles.length) return false;
+  const r = tiles[row];
+  if (!r || col < 0 || col >= r.length) return false;
+  return r[col] === 'ground';
+}
+
+function resolveY(p, tiles) {
+  const top    = Math.floor(p.y / TILE);
+  const bottom = Math.floor((p.y + p.h - 1) / TILE);
+  const left   = Math.floor(p.x / TILE);
+  const right  = Math.floor((p.x + p.w - 1) / TILE);
+
+  if (p.vy > 0) {
+    if (isSolid(tiles, left, bottom) || isSolid(tiles, right, bottom)) {
+      p.y = bottom * TILE - p.h;
+      p.vy = 0; p.onGround = true; p.jumpsLeft = 2;
+      return;
+    }
+  } else if (p.vy < 0) {
+    if (isSolid(tiles, left, top) || isSolid(tiles, right, top)) {
+      p.y = (top + 1) * TILE;
+      p.vy = 0;
+    }
+  }
+  p.onGround = false;
+}
+
+function resolveX(p, tiles) {
+  const top    = Math.floor(p.y / TILE);
+  const bottom = Math.floor((p.y + p.h - 1) / TILE);
+  const left   = Math.floor(p.x / TILE);
+  const right  = Math.floor((p.x + p.w - 1) / TILE);
+
+  p.onWall = 0;
+  if (p.vx > 0) {
+    if (isSolid(tiles, right, top) || isSolid(tiles, right, bottom)) {
+      p.x = right * TILE - p.w;
+      p.vx = 0; p.onWall = 1;
+    }
+  } else if (p.vx < 0) {
+    if (isSolid(tiles, left, top) || isSolid(tiles, left, bottom)) {
+      p.x = (left + 1) * TILE;
+      p.vx = 0; p.onWall = -1;
+    }
+  }
+}
+
+// ── RECT OVERLAP ──────────────────────────────────────────────
+function overlaps(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+// ── PARTICLES ─────────────────────────────────────────────────
+function burst(particles, x, y, n, colors) {
+  for (let i = 0; i < n; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.5 + Math.random() * 3.5;
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 2,
+      life: 1, decay: 0.03 + Math.random() * 0.03,
+      size: 3 + Math.random() * 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
+  }
+}
+
+// ── CAMERA ────────────────────────────────────────────────────
+function updateCamera(cam, player, levelW, levelH) {
+  const tx = player.x + player.w / 2 - W / 2;
+  const ty = player.y + player.h / 2 - H / 2;
+  cam.x += (tx - cam.x) * 0.1;
+  cam.y += (ty - cam.y) * 0.1;
+  cam.x = Math.max(0, Math.min(levelW - W, cam.x));
+  cam.y = Math.max(0, Math.min(levelH - H, cam.y));
+}
+
+// ── INIT GAME ─────────────────────────────────────────────────
+function initLevel(levelIdx) {
+  const lvl = parseLevel(levelIdx);
+  const levelW = LEVELS[levelIdx % LEVELS.length].trim().split('\n')[0].length * TILE;
+  const levelH = LEVELS[levelIdx % LEVELS.length].trim().split('\n').length * TILE;
+
+  G = {
+    levelIdx,
+    tiles: lvl.tiles,
+    coins: lvl.coins,
+    enemies: lvl.enemies,
+    spikes: lvl.spikes,
+    portal: lvl.portal,
+    player: makePlayer(lvl.playerStart.x, lvl.playerStart.y),
+    particles: [],
+    floatingTexts: [],
+    cam: { x: 0, y: 0 },
+    score: (G.score || 0),
+    coins_collected: (G.coins_collected || 0),
+    levelW, levelH,
+    frame: 0,
+    portalAnim: 0,
+    won: false,
+    over: false,
+    jumpQueued: false,
+    prevJump: false,
+  };
+  updateHUD();
+}
+
+function startGame() {
+  currentLevel = 0;
+  G = { score: 0, coins_collected: 0 };
+  hide('screen-title'); hide('screen-win'); hide('screen-over');
+  initLevel(0);
+  if (!running) { running = true; rafId = requestAnimationFrame(loop); }
+}
+
+function nextLevel() {
+  currentLevel++;
+  hide('screen-win');
+  initLevel(currentLevel);
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────────
+let lastTime = 0;
+function loop(ts) {
+  rafId = requestAnimationFrame(loop);
+  const dt = Math.min(ts - lastTime, 32); // cap at ~30fps equiv
+  lastTime = ts;
+  if (!G.tiles) return;
+  update(dt);
+  render();
+}
+
+// ── UPDATE ────────────────────────────────────────────────────
+function update(dt) {
+  if (G.won || G.over) return;
+  G.frame++;
+
+  const p = G.player;
+
+  // ── JUMP QUEUE ──
+  const jumpNow = pressing('jump');
+  if (jumpNow && !G.prevJump) G.jumpQueued = true;
+  G.prevJump = jumpNow;
+
+  // ── PLAYER MOVEMENT ──
+  const spd = 3.6;
+  const acc = p.onGround ? 0.55 : 0.35;
+  const fric = p.onGround ? 0.78 : 0.90;
+
+  if (pressing('left'))  { p.vx -= acc; p.facing = -1; }
+  if (pressing('right')) { p.vx += acc; p.facing =  1; }
+  p.vx *= fric;
+  if (Math.abs(p.vx) > spd) p.vx = Math.sign(p.vx) * spd;
+
+  // ── JUMP ──
+  if (G.jumpQueued) {
+    G.jumpQueued = false;
+    if (p.jumpsLeft > 0) {
+      p.vy = -11;
+      p.jumpsLeft--;
+      p.onGround = false;
+      sfxJump();
+      burst(G.particles, p.x + p.w/2, p.y + p.h, 8, ['#00f5ff','#ffffff']);
+    } else if (p.onWall !== 0) {
+      // wall jump
+      p.vy = -10;
+      p.vx = -p.onWall * 5;
+      p.jumpsLeft = 1;
+      sfxJump();
+    }
+  }
+
+  // ── GRAVITY ──
+  p.vy += GRAVITY;
+  if (p.vy > MAX_FALL) p.vy = MAX_FALL;
+
+  // ── INTEGRATE & COLLIDE ──
+  p.x += p.vx;
+  resolveX(p, G.tiles);
+  p.y += p.vy;
+  resolveY(p, G.tiles);
+
+  // ── PLAYER TRAIL ──
+  p.trail.push({x: p.x + p.w/2, y: p.y + p.h/2, life:1});
+  if (p.trail.length > 8) p.trail.shift();
+  p.trail.forEach(t => t.life -= 0.15);
+
+  // ── BOUNDARY: fell off bottom ──
+  if (p.y > G.levelH + 64) {
+    takeDamage(3);
+    p.x = G.player.x; p.y = 100; p.vy = 0;
+  }
+
+  // ── INVINCIBILITY ──
+  if (p.invincible > 0) p.invincible--;
+
+  // ── ENEMIES ──
+  for (const e of G.enemies) {
+    if (!e.alive) continue;
+    e.vy += GRAVITY;
+    if (e.vy > MAX_FALL) e.vy = MAX_FALL;
+    e.x += e.vx; resolveX(e, G.tiles);
+    e.y += e.vy; resolveY(e, G.tiles);
+
+    // reverse at edges
+    const ecol = Math.floor(e.x / TILE);
+    const erow = Math.floor((e.y + e.h + 2) / TILE);
+    const ahead = Math.floor((e.x + (e.vx > 0 ? e.w + 2 : -2)) / TILE);
+    if (!isSolid(G.tiles, ahead, erow) && e.onGround) e.vx *= -1;
+    if (isSolid(G.tiles, Math.floor(e.x / TILE), Math.floor(e.y / TILE))) e.vx *= -1;
+
+    e.frameTimer++;
+    if (e.frameTimer > 8) { e.frame = (e.frame+1)%2; e.frameTimer=0; }
+
+    // ── PLAYER VS ENEMY ──
+    if (overlaps(p, e)) {
+      // stomped?
+      if (p.vy > 0 && p.y + p.h < e.y + e.h * 0.6) {
+        e.alive = false;
+        p.vy = -8;
+        G.score += 100;
+        sfxKill();
+        burst(G.particles, e.x+e.w/2, e.y+e.h/2, 14,
+          [COLORS.enemy1, COLORS.enemy2, '#ffffff']);
+        addFloatingText('+100', e.x+e.w/2, e.y, '#ff3cac');
+      } else {
+        takeDamage(1);
+      }
+    }
+  }
+
+  // ── COINS ──
+  for (const c of G.coins) {
+    if (!c.alive) continue;
+    if (overlaps(p, c)) {
+      c.alive = false;
+      G.coins_collected++;
+      G.score += 50;
+      sfxCoin();
+      burst(G.particles, c.x+c.w/2, c.y+c.h/2, 10, [COLORS.coin,'#fff8dc','#fffacd']);
+      addFloatingText('+50', c.x+c.w/2, c.y, '#ffd700');
+    }
+  }
+
+  // ── SPIKES ──
+  for (const s of G.spikes) {
+    if (overlaps(p, s)) takeDamage(2);
+  }
+
+  // ── PORTAL ──
+  if (G.portal && overlaps(p, G.portal)) {
+    G.won = true;
+    sfxPortal();
+    G.score += 500 + G.coins.filter(c=>!c.alive).length * 100;
+    setTimeout(showWin, 800);
+  }
+
+  G.portalAnim = (G.portalAnim + 0.06) % (Math.PI * 2);
+
+  // ── PARTICLES ──
+  for (let i = G.particles.length - 1; i >= 0; i--) {
+    const pt = G.particles[i];
+    pt.x += pt.vx; pt.y += pt.vy;
+    pt.vy += 0.1;
+    pt.life -= pt.decay;
+    if (pt.life <= 0) G.particles.splice(i, 1);
+  }
+
+  // ── FLOATING TEXTS ──
+  for (let i = G.floatingTexts.length - 1; i >= 0; i--) {
+    const ft = G.floatingTexts[i];
+    ft.y -= 0.8; ft.life -= 0.025;
+    if (ft.life <= 0) G.floatingTexts.splice(i, 1);
+  }
+
+  // ── CAMERA ──
+  updateCamera(G.cam, p, G.levelW, G.levelH);
+
+  // ── PLAYER ANIMATION ──
+  p.frameTimer++;
+  if (p.frameTimer > 6) { p.frame = (p.frame+1)%4; p.frameTimer=0; }
+
+  updateHUD();
+}
+
+function takeDamage(amt) {
+  const p = G.player;
+  if (p.invincible > 0) return;
+  p.health -= amt;
+  p.invincible = 60;
+  sfxHurt();
+  burst(G.particles, p.x+p.w/2, p.y+p.h/2, 12, ['#ff3cac','#ff6b6b','#fff']);
+  if (p.health <= 0) {
+    p.health = 0; G.over = true;
+    setTimeout(showOver, 900);
+  }
+}
+
+function addFloatingText(text, x, y, color) {
+  G.floatingTexts.push({ text, x, y, color, life: 1 });
+}
+
+// ── HUD ───────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('h-score').textContent = G.score;
+  document.getElementById('h-coins').textContent = G.coins_collected;
+  document.getElementById('h-level').textContent = (G.levelIdx || 0) + 1;
+  const hp = G.player ? G.player.health / 5 * 100 : 100;
+  document.getElementById('health-fill').style.width = hp + '%';
+  if (G.score > hiScore) { hiScore = G.score; localStorage.setItem('novaDashHi', hiScore); }
+  document.getElementById('h-hi').textContent = hiScore;
+}
+
+// ── SCREENS ───────────────────────────────────────────────────
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+
+function showWin() {
+  const allCoins = G.coins.length;
+  const got = G.coins.filter(c=>!c.alive).length;
+  document.getElementById('win-stats').innerHTML = `
+    <div class="lbl">Score</div><div class="val">${G.score}</div>
+    <div class="lbl">Coins</div><div class="val">${got} / ${allCoins}</div>
+    <div class="lbl">Level</div><div class="val">${(G.levelIdx||0)+1}</div>
+  `;
+  sfxWin();
+  show('screen-win');
+}
+
+function showOver() {
+  document.getElementById('over-stats').innerHTML = `
+    <div class="lbl">Final Score</div><div class="val">${G.score}</div>
+    <div class="lbl">Hi-Score</div><div class="val">${hiScore}</div>
+    <div class="lbl">Reached Level</div><div class="val">${(G.levelIdx||0)+1}</div>
+  `;
+  show('screen-over');
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function render() {
+  ctx.save();
+  ctx.translate(-Math.floor(G.cam.x), -Math.floor(G.cam.y));
+
+  // ── BG GRADIENT ──
+  const grad = ctx.createLinearGradient(G.cam.x, G.cam.y, G.cam.x, G.cam.y + H);
+  grad.addColorStop(0, COLORS.sky1);
+  grad.addColorStop(1, COLORS.sky2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(G.cam.x, G.cam.y, W, H);
+
+  // ── STARS ──
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  for (let i = 0; i < 40; i++) {
+    const sx = ((i * 197 + G.cam.x * 0.2) % W) + G.cam.x;
+    const sy = ((i * 137) % (H * 0.6)) + G.cam.y;
+    ctx.fillRect(sx, sy, 1, 1);
+  }
+
+  // ── TILES ──
+  const startC = Math.max(0, Math.floor(G.cam.x / TILE));
+  const endC   = Math.min((G.tiles[0]||[]).length, Math.ceil((G.cam.x + W) / TILE) + 1);
+  const startR = Math.max(0, Math.floor(G.cam.y / TILE));
+  const endR   = Math.min(G.tiles.length, Math.ceil((G.cam.y + H) / TILE) + 1);
+
+  for (let r = startR; r < endR; r++) {
+    for (let c = startC; c < endC; c++) {
+      if (!G.tiles[r] || G.tiles[r][c] !== 'ground') continue;
+      const tx = c * TILE, ty = r * TILE;
+      ctx.fillStyle = COLORS.ground;
+      ctx.fillRect(tx, ty + 2, TILE, TILE - 2);
+      // top highlight
+      const above = G.tiles[r-1] ? G.tiles[r-1][c] : null;
+      if (above !== 'ground') {
+        ctx.fillStyle = COLORS.groundTop;
+        ctx.fillRect(tx, ty, TILE, 3);
+        // subtle grid lines
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(tx, ty+2, 1, TILE-2);
+        ctx.fillRect(tx, ty+2, TILE, 1);
+      }
+    }
+  }
+
+  // ── SPIKES ──
+  for (const s of G.spikes) {
+    ctx.fillStyle = COLORS.spike;
+    ctx.beginPath();
+    for (let i = 0; i < 4; i++) {
+      const bx = s.x + i * 8;
+      ctx.moveTo(bx, s.y + s.h);
+      ctx.lineTo(bx + 4, s.y);
+      ctx.lineTo(bx + 8, s.y + s.h);
+    }
+    ctx.fill();
+  }
+
+  // ── COINS ──
+  for (const c of G.coins) {
+    if (!c.alive) continue;
+    const bob = Math.sin(G.frame * 0.08 + c.x * 0.1) * 3;
+    const cx = c.x + c.w/2, cy = c.y + c.h/2 + bob;
+    const glow = ctx.createRadialGradient(cx, cy, 2, cx, cy, 10);
+    glow.addColorStop(0, '#fffde7');
+    glow.addColorStop(0.4, COLORS.coin);
+    glow.addColorStop(1, 'rgba(255,215,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = COLORS.coin;
+    ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fffde7';
+    ctx.beginPath(); ctx.arc(cx-1.5, cy-1.5, 2, 0, Math.PI*2); ctx.fill();
+  }
+
+  // ── PORTAL ──
+  if (G.portal) {
+    const pa = G.portalAnim;
+    const px = G.portal.x + G.portal.w/2;
+    const py = G.portal.y + G.portal.h/2;
+    // outer ring
+    for (let i = 3; i >= 0; i--) {
+      const r2 = 18 + i * 4 + Math.sin(pa + i) * 3;
+      const alpha = 0.1 + i * 0.08;
+      ctx.strokeStyle = `rgba(57,255,20,${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(px, py, r2, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(57,255,20,${0.3 + Math.sin(pa)*0.2})`;
+    ctx.beginPath(); ctx.arc(px, py, 14, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('▲', px, py + 6);
+  }
+
+  // ── ENEMIES ──
+  for (const e of G.enemies) {
+    if (!e.alive) continue;
+    const ex = e.x + e.w/2, ey = e.y;
+    const bob = Math.sin(G.frame * 0.1 + e.x) * 2;
+    // body
+    ctx.fillStyle = COLORS.enemy1;
+    ctx.fillRect(e.x+2, ey + bob + 4, e.w-4, e.h-4);
+    // eyes
+    ctx.fillStyle = '#fff';
+    const eyeX = e.vx > 0 ? e.x+12 : e.x+6;
+    ctx.fillRect(eyeX, ey + bob + 7, 4, 4);
+    ctx.fillRect(eyeX+2, ey + bob + 8, 2, 2); // pupil
+    ctx.fillStyle = '#000';
+    ctx.fillRect(eyeX + (e.vx>0?2:0), ey + bob + 8, 2, 2);
+    // legs
+    const legOffset = e.frame === 0 ? 3 : -3;
+    ctx.fillStyle = '#cc2288';
+    ctx.fillRect(e.x + 4,           ey + bob + e.h - 4, 6, 4);
+    ctx.fillRect(e.x + e.w - 10,    ey + bob + e.h - 4 + (e.frame===0?2:-2), 6, 4);
+    // glow
+    ctx.shadowColor = COLORS.enemy1;
+    ctx.shadowBlur  = 8;
+    ctx.fillStyle = 'rgba(255,60,172,0.2)';
+    ctx.fillRect(e.x, ey + bob, e.w, e.h);
+    ctx.shadowBlur = 0;
+  }
+
+  // ── PLAYER TRAIL ──
+  for (let i = 0; i < G.player.trail.length; i++) {
+    const t = G.player.trail[i];
+    const a = t.life * 0.35 * (i / G.player.trail.length);
+    ctx.fillStyle = `rgba(0,245,255,${a})`;
+    const sz = 4 + i * 1.5;
+    ctx.fillRect(t.x - sz/2, t.y - sz/2, sz, sz);
+  }
+
+  // ── PLAYER ──
+  const p = G.player;
+  const blink = p.invincible > 0 && Math.floor(G.frame / 4) % 2 === 0;
+  if (!blink) {
+    ctx.save();
+    ctx.translate(p.x + p.w/2, p.y + p.h/2);
+    ctx.scale(p.facing, 1);
+
+    // body glow
+    ctx.shadowColor = COLORS.player;
+    ctx.shadowBlur = 12;
+
+    // body
+    ctx.fillStyle = COLORS.player;
+    ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+
+    // visor
+    ctx.fillStyle = '#001f3f';
+    ctx.fillRect(-p.w/2+4, -p.h/2+4, p.w-8, 10);
+    ctx.fillStyle = 'rgba(0,245,255,0.6)';
+    ctx.fillRect(-p.w/2+5, -p.h/2+5, p.w-10, 6);
+
+    // jetpack detail
+    ctx.fillStyle = '#0080a0';
+    ctx.fillRect(-p.w/2, p.h/2-8, 6, 8);
+    if (!p.onGround) {
+      ctx.fillStyle = `rgba(0,245,255,${0.4+Math.random()*0.4})`;
+      ctx.fillRect(-p.w/2+1, p.h/2, 4, 3+Math.random()*4);
+    }
+
+    // legs
+    const legFrame = p.onGround ? Math.floor(G.frame/5)%2 : 0;
+    ctx.fillStyle = '#007090';
+    ctx.fillRect(-p.w/2+2,     p.h/2-6, 8, 6 + (legFrame?2:0));
+    ctx.fillRect( p.w/2-10,    p.h/2-6, 8, 6 + (legFrame?0:2));
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // ── PARTICLES ──
+  for (const pt of G.particles) {
+    ctx.globalAlpha = pt.life;
+    ctx.fillStyle = pt.color;
+    ctx.fillRect(pt.x - pt.size/2, pt.y - pt.size/2, pt.size, pt.size);
+  }
+  ctx.globalAlpha = 1;
+
+  // ── FLOATING TEXTS ──
+  for (const ft of G.floatingTexts) {
+    ctx.globalAlpha = ft.life;
+    ctx.fillStyle = ft.color;
+    ctx.font = 'bold 14px "Press Start 2P", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+
+  ctx.restore(); // un-translate camera
+}
+
+// ── BOOT ──────────────────────────────────────────────────────
+document.getElementById('h-hi').textContent = hiScore;
+</script>
+</body>
+</html>
