@@ -8,11 +8,7 @@ A handcrafted 2D sci-fi platformer built entirely in vanilla HTML, CSS, and Java
 
 ## 📸 Preview
 
-<!-- Record a GIF with ScreenToGif (Windows) or Kap (Mac) and drop it here -->
-
-![Nova Dash Screenshot](screenshot.png)
-
----
+<img width="977" height="939" alt="NovaDashAnimation" src="https://github.com/user-attachments/assets/ac24c54a-daf8-40a4-9e38-725687f2b365" />
 
 ## 🎮 How to Play
 
