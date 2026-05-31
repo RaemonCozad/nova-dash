@@ -2,7 +2,7 @@
 
 A handcrafted 2D sci-fi platformer built entirely in vanilla HTML, CSS, and JavaScript — no engines, no libraries, no build tools. Every system was written from scratch: physics, collision, camera, AI, particles, and audio.
 
-🔗 **[Play it live →](https://yourusername.github.io/nova-dash/nova-dash.html)**
+🔗 **[Play it live →](https://raemoncozad.github.io/nova-dash)**
 
 > _Replace the link above with your GitHub Pages URL after deploying._
 
