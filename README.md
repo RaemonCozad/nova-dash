@@ -4,8 +4,6 @@ A handcrafted 2D sci-fi platformer built entirely in vanilla HTML, CSS, and Java
 
 🔗 **[Play it live →](https://raemoncozad.github.io/nova-dash)**
 
-> _Replace the link above with your GitHub Pages URL after deploying._
-
 ---
 
 ## 📸 Preview
